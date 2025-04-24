@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js Interactive Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .tooltip {
+            position: absolute;
+            visibility: hidden;
+            background: lightgray;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        svg {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Interactive Data Visualization</h1>
+
+    <label for="dropdown1">Select Attribute 1:</label>
+    <select id="dropdown1"></select>
+
+    <label for="dropdown2">Select Attribute 2:</label>
+    <select id="dropdown2"></select>
+
+    <div>
+        <h3>Histogram 1</h3>
+        <svg id="histogram1" width="600" height="400"></svg>
+    </div>
+
+    <div>
+        <h3>Histogram 2</h3>
+        <svg id="histogram2" width="600" height="400"></svg>
+    </div>
+
+    <div>
+        <h3>Scatterplot</h3>
+        <svg id="scatterplot" width="600" height="400"></svg>
+    </div>
+
+    <script>
+        // Declare global data variable
+        let data = [];
+
+        // Load the CSV file
+        d3.csv("data.csv").then(loadedData => {
+            console.log("Data loading complete.");
+            data = loadedData; // Assign loaded data to global variable
+
+            // Process the data
+            data.forEach(d => {
+                d.PovertyValue = +d.PovertyValue;
+                d.MHI_Value = +d.MHI_Value;
+                d.Foodstamp_Value = +d.Foodstamp_Value;
+                d.Obesity_Value = +d.Obesity_Value;
+                d.Physicalinactivity_Value = +d.Physicalinactivity_Value;
+                d.unemployment_Value = +d.unemployment_Value;
+            });
+
+            console.log("Processed Data:", data);
+
+            // Initialize dropdowns after data is fully loaded
+            initializeDropdowns();
+
+            // Call updateCharts() after initializing dropdowns
+            updateCharts();
+
+        }).catch(error => {
+            console.error("Error loading data:", error);
+        });
+
+        function initializeDropdowns() {
+            const dropdown1 = d3.select("#dropdown1");
+            const dropdown2 = d3.select("#dropdown2");
+
+            const columns = [
+                "PovertyValue",
+                "MHI_Value",
+                "Foodstamp_Value",
+                "Obesity_Value",
+                "Physicalinactivity_Value",
+                "unemployment_Value"
+            ];
+
+            // Remove existing options (prevent duplication)
+            dropdown1.selectAll("option").remove();
+            dropdown2.selectAll("option").remove();
+
+            // Populate dropdowns with column names
+            dropdown1.selectAll("option")
+                .data(columns)
+                .enter().append("option")
+                .text(d => d)
+                .attr("value", d => d);
+
+            dropdown2.selectAll("option")
+                .data(columns)
+                .enter().append("option")
+                .text(d => d)
+                .attr("value", d => d);
+
+            // Set default selections (ensure values are not undefined)
+            dropdown1.property("value", columns[0]); // Select first item
+            dropdown2.property("value", columns[1]); // Select second item
+
+            // Add event listeners
+            dropdown1.on("change", updateCharts);
+            dropdown2.on("change", updateCharts);
+        }
+
+        function updateCharts() {
+            if (!data || data.length === 0) {
+                console.warn("Data is not yet loaded.");
+                return;
+            }
+
+            const Attribute1 = d3.select("#dropdown1").node().value;
+            const Attribute2 = d3.select("#dropdown2").node().value;
+
+            console.log("Selected Attributes:", Attribute1, Attribute2);
+
+            const filteredData = data.map(d => ({
+                x: +d[Attribute1], 
+                y: +d[Attribute2]
+            })).filter(d => !isNaN(d.x) && !isNaN(d.y));
+
+            if (filteredData.length === 0) {
+                console.warn("No valid data points after filtering.");
+                return;
+            }
+
+            // Clear previous visualizations
+            d3.select("#histogram1").selectAll("*").remove();
+            d3.select("#histogram2").selectAll("*").remove();
+            d3.select("#scatterplot").selectAll("*").remove();
+
+            // Generate new charts
+            createHistogram(filteredData, "x", "#histogram1", Attribute1);
+            createHistogram(filteredData, "y", "#histogram2", Attribute2);
+            createScatterplot(filteredData, Attribute1, Attribute2);
+        }
+
+        function createHistogram(data, attribute, container, label) {
+            let svg = d3.select(container)
+                .append("g")
+                .attr("transform", "translate(50, 20)");
+
+            let width = 500;
+            let height = 350;
+
+            let x = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d[attribute])])
+                .range([0, width]);
+
+            let bins = d3.histogram()
+                .domain(x.domain())
+                .thresholds(x.ticks(20))
+                (data.map(d => d[attribute]));
+
+            let y = d3.scaleLinear()
+                .domain([0, d3.max(bins, d => d.length)])
+                .range([height, 0]);
+
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x));
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            let tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip");
+
+            svg.selectAll("rect")
+                .data(bins)
+                .enter().append("rect")
+                .attr("x", d => x(d.x0))
+                .attr("width", d => Math.max(1, x(d.x1) - x(d.x0) - 1))
+                .attr("y", d => y(d.length))
+                .attr("height", d => height - y(d.length))
+                .attr("fill", "steelblue")
+                .on("mouseover", (event, d) => {
+                    tooltip.style("visibility", "visible")
+                        .text(`Count: ${d.length}`);
+                })
+                .on("mousemove", event => {
+                    tooltip.style("top", (event.pageY - 10) + "px")
+                        .style("left", (event.pageX + 10) + "px");
+                })
+                .on("mouseout", () => tooltip.style("visibility", "hidden"));
+        }
+
+        function createScatterplot(data, attrX, attrY) {
+            let svg = d3.select("#scatterplot")
+                .append("g")
+                .attr("transform", "translate(50, 20)");
+
+            let width = 500;
+            let height = 350;
+
+            let x = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.x))
+                .range([0, width]);
+
+            let y = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.y))
+                .range([height, 0]);
+
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x));
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            let tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip");
+
+            svg.selectAll("circle")
+                .data(data)
+                .enter().append("circle")
+                .attr("cx", d => x(d.x))
+                .attr("cy", d => y(d.y))
+                .attr("r", 4)
+                .attr("fill", "orange")
+                .on("mouseover", (event, d) => {
+                    tooltip.style("visibility", "visible")
+                        .text(`${attrX}: ${d.x}, ${attrY}: ${d.y}`);
+                })
+                .on("mouseout", () => tooltip.style("visibility", "hidden"));
+        }
+    </script>
+</body>
+</html>

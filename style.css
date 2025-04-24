@@ -1,0 +1,74 @@
+/* body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+  } */
+  
+  .viz {
+    width: 100%;
+    height: 600px; /* Adjust to your desired height */
+  }
+.background {
+            fill: none;
+            pointer-events: all;
+}
+
+#states {
+    fill: #aaa;
+}
+
+#states .active {
+    display:none;
+}
+
+#state-borders {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.5px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    pointer-events: none;
+}
+
+.county-boundary {
+    fill: blue;
+    stroke: #fff;
+    stroke-width: .5px;
+}
+
+.county-boundary:hover, .state:hover {
+    fill: blue;
+}
+
+#tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 255);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0; /* Hidden by default */
+    visibility: hidden; /* Hidden by default */
+    transition: opacity 0.2s, visibility 0.2s; /* Smooth fade-in */
+    z-index: 1000;
+  }
+  
+  .tooltip-title {
+    color: blue;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  #legend {
+    margin-top: 20px;
+  }
+
+  #histogramdropdown1{
+    top:-500px;
+    left: -500px;
+    bottom: -500px;
+
+  }
+

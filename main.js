@@ -36,7 +36,7 @@ function createTooltip() {
         .attr("class", "tooltip")
         .style("position", "absolute")
         .style("visibility", "hidden")
-        .style("background", "yellow")  // Dark background for better contrast
+        .style("background", "#dea3bf")  // Dark background for better contrast
         .style("color", "black")       // White text color
         .style("border", "1px solid #ccc")
         .style("padding", "5px")
@@ -51,12 +51,12 @@ function initializeDropdowns() {
     const dropdown3 = d3.select("#dropdown3");
 
     const columns = [
-        "PovertyValue",
+        "Poverty_Value",
         "MHI_value",
-        "Foodstamp_Value",
+        "Food_Stamp_Value",
         "Obesity_Value",
-        "Physicalinactivity_Value",
-        "unemployment_Value"
+        "Physical_Inactivity_Value",
+        "Unemployment_Value"
     ];
 
     dropdown1.selectAll("option").remove();
@@ -66,19 +66,19 @@ function initializeDropdowns() {
     dropdown1.selectAll("option")
         .data(columns)
         .enter().append("option")
-        .text(d => d)
+        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
         .attr("value", d => d);
 
     dropdown2.selectAll("option")
         .data(columns)
         .enter().append("option")
-        .text(d => d)
+        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
         .attr("value", d => d);
 
     dropdown3.selectAll("option")
         .data(columns)
         .enter().append("option")
-        .text(d => d)
+        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
         .attr("value", d => d);
 
     dropdown1.property("value", columns[0]);
@@ -167,7 +167,7 @@ function renderMap(colorScale, attribute) {
     const tooltip = d3.select("body").append("div")
         .attr("class", "tooltip")
         .style("position", "absolute")
-        .style("background", "yellow")
+        .style("background", "#dea3bf")
         .style("color", "black")
         .style("padding", "5px 10px")
         .style("border-radius", "5px")
@@ -250,10 +250,10 @@ function renderLegend(colorScale) {
 function createHistogram(data, attribute, container, label) {
     let svg = d3.select(container)
         .attr("width", 600)
-        .attr("height", 400).attr("style", "border: 2px solid black;")
+        .attr("height", 450)
+        .attr("style", "border: 2px solid black;")
         .append("g")
-        .attr("transform", "translate(50, 20)");
-        
+        .attr("transform", "translate(50, 30)");
 
     let width = 500;
     let height = 350;
@@ -271,13 +271,37 @@ function createHistogram(data, attribute, container, label) {
         .domain([0, d3.max(bins, d => d.length)])
         .range([height, 0]);
 
+    // X Axis
     svg.append("g")
         .attr("transform", `translate(0, ${height})`)
-        .call(d3.axisBottom(x))
-        
+        .call(d3.axisBottom(x));
 
+    // Y Axis
     svg.append("g")
         .call(d3.axisLeft(y));
+
+    // Title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", -10)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .text(" Histogram of " + label.replace(/_/g, " "));
+
+    // X Axis Label
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + 35)
+        .attr("text-anchor", "middle")
+        .text(label.replace(/_/g, " "));
+
+    // Y Axis Label
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -35)
+        .attr("text-anchor", "middle")
+        .text("Count");
 
     let tooltip = createTooltip();
 
@@ -303,10 +327,10 @@ function createHistogram(data, attribute, container, label) {
 function createScatterplot(data, attrX, attrY) {
     let svg = d3.select("#scatterplot")
         .attr("width", 600)
-        .attr("height", 400)
+        .attr("height", 450)
         .attr("style", "border: 2px solid black;")
         .append("g")
-        .attr("transform", "translate(50, 20)");
+        .attr("transform", "translate(50, 30)");
 
     let width = 500;
     let height = 350;
@@ -319,18 +343,42 @@ function createScatterplot(data, attrX, attrY) {
         .domain(d3.extent(data, d => d.y))
         .range([height, 0]);
 
+    // X Axis
     svg.append("g")
         .attr("transform", `translate(0, ${height})`)
         .call(d3.axisBottom(x));
 
+    // Y Axis
     svg.append("g")
         .call(d3.axisLeft(y));
 
-    // Create tooltip
+    // Title
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", -10)
+        .attr("text-anchor", "middle")
+        .style("font-size", "16px")
+        .text(attrX.replace(/_/g, " ") + " vs " + attrY.replace(/_/g, " "));
+
+    // X Axis Label
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + 35)
+        .attr("text-anchor", "middle")
+        .text(attrX.replace(/_/g, " "));
+
+    // Y Axis Label
+    svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -35)
+        .attr("text-anchor", "middle")
+        .text(attrY.replace(/_/g, " "));
+
     const tooltip = d3.select("body").append("div")
         .attr("class", "tooltip")
         .style("position", "absolute")
-        .style("background", "yellow")
+        .style("background", "#dea3bf")
         .style("color", "black")
         .style("padding", "5px 10px")
         .style("border-radius", "5px")
@@ -343,10 +391,11 @@ function createScatterplot(data, attrX, attrY) {
         .attr("cx", d => x(d.x))
         .attr("cy", d => y(d.y))
         .attr("r", 4)
-        .attr("fill", "orange")
+        .attr("fill", "steelblue")
+        .attr("opacity",0.5)
         .on("mouseover", (event, d) => {
             tooltip.style("visibility", "visible")
-                .html(`<strong>${d.display_name}</strong><br>${attrX}: ${d.x}<br>${attrY}: ${d.y}`);
+                .html(`<strong>${d.display_name}</strong><br>${attrX.replace(/_/g, " ")}: ${d.x}<br>${attrY.replace(/_/g, " ")}: ${d.y}`);
         })
         .on("mousemove", event => {
             tooltip.style("top", `${event.pageY + 10}px`)

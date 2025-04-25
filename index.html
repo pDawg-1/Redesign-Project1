@@ -11,40 +11,40 @@
 
     <!-- Styles -->
     <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-        .chart-container {
-            flex: 1;
-            min-width: 600px;
-        }
-        .dropdown-container {
-            margin-bottom: 20px;
-        }
-        svg {
-            border: 1px solid #ccc;
-        }
-        .tooltip {
-            position: absolute;
-            background: blue;
-            color: #fff;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            pointer-events: none;
-            visibility: hidden;
-        }
+    body {
+        background-color: #dfecfa;
+        font-family: 'Arial', sans-serif;
+    }
 
-        body{
-    background-image: url("bg3.JPG");
-    background-size: 100vw 100vh;
+    .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
 
-}
+    .chart-container {
+        flex: 1;
+        min-width: 600px;
+    }
+
+    .dropdown-container {
+        margin-bottom: 20px;
+    }
+
+    svg {
+        border: 1px solid #ccc;
+    }
+
+    .tooltip {
+        position: absolute;
+        background: blue;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        pointer-events: none;
+        visibility: hidden;
+    }
     </style>
 </head>
 <body>
@@ -53,31 +53,23 @@
 
     <!-- Dropdowns for histogram and scatterplot -->
     <div class="dropdown-container">
-        <label for="dropdown1">Select Attribute 1:</label>
+        <!-- Dropdown 1 -->
+        <label id="label1" for="dropdown1">Select Attribute 1</label>
         <select id="dropdown1"></select>
 
-        <label for="dropdown2">Select Attribute 2:</label>
+        <!-- Dropdown 2 -->
+        <label id="label2" for="dropdown2">Select Attribute 2</label>
         <select id="dropdown2"></select>
     </div>
 
     <div class="container">
         <div class="chart-container">
-            
+            <h3>Histogram 1</h3>
             <svg id="histogram1" width="600" height="400"></svg>
             <svg id="histogram2" width="600" height="400"></svg>
             <svg id="scatterplot" width="600" height="400"></svg>
-
-
         </div>
-
-        <!-- <div class="chart-container">
-            <h3>Histogram 2</h3>
-                   </div> -->
     </div>
-
-    <!-- <div class="chart-container">
-        <h3>Scatterplot</h3>
-            </div> -->
 
     <hr>
 
@@ -87,8 +79,19 @@
         <select id="dropdown3"></select>
     </div>
 
-    <div class="viz"></div>
-    <div id="legend"></div>
+    <div class="container" style="padding-left: 100px;">
+        <div class="chart-container">
+            <div class="viz"></div>
+            <div id="legend"></div>
+        </div>
+
+        <!-- Radar Chart Container -->
+        <div class="chart-container" style="padding-left: 500px;">
+            <h3>Radar Chart</h3>
+            <div id="radarChart"></div>
+
+        </div>
+    </div>
 
     <!-- JavaScript File -->
     <script src="main.js"></script>

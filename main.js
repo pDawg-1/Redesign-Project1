@@ -1,201 +1,131 @@
-// Declare global data variable
-let data = [];
-let countyData = [];
-let geoData = [];
+// Global data and brush tracker
+let data = [], countyData = [], geoData = [];
+let activeBrush = null;
+let currentFilter = null;
 
-// Load the CSV and TopoJSON files
+// Load CSV and TopoJSON files
 Promise.all([
     d3.json("counties-10m.json"),
     d3.csv("data.csv")
 ]).then(loadedData => {
-    console.log("Data loading complete.");
-    
     geoData = loadedData[0];
     countyData = loadedData[1];
-    data = countyData; // Assign loaded data to global variable
+    data = countyData;
 
-    // Process the data
     data.forEach(d => {
-        d.PovertyValue = +d.PovertyValue;
+        d.Poverty_Value = +d.Poverty_Value;
         d.MHI_value = +d.MHI_value;
-        d.Foodstamp_Value = +d.Foodstamp_Value;
+        d.Food_Stamp_Value = +d.Food_Stamp_Value;
         d.Obesity_Value = +d.Obesity_Value;
-        d.Physicalinactivity_Value = +d.Physicalinactivity_Value;
-        d.unemployment_Value = +d.unemployment_Value;
+        d.Physical_Inactivity_Value = +d.Physical_Inactivity_Value;
+        d.Unemployment_Value = +d.Unemployment_Value;
     });
 
-    console.log("Processed Data:", data);
     initializeDropdowns();
     updateCharts();
     initializeMap();
-}).catch(error => {
-    console.error("Error loading data:", error);
-});
-function createTooltip() {
-    return d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("visibility", "hidden")
-        .style("background", "#dea3bf")  // Dark background for better contrast
-        .style("color", "black")       // White text color
-        .style("border", "1px solid #ccc")
-        .style("padding", "5px")
-        .style("border-radius", "5px")
-        .style("box-shadow", "0px 0px 5px rgba(0,0,0,0.3)")
-        .style("pointer-events", "none");
-}
+}).catch(console.error);
 
 function initializeDropdowns() {
-    const dropdown1 = d3.select("#dropdown1");
-    const dropdown2 = d3.select("#dropdown2");
-    const dropdown3 = d3.select("#dropdown3");
-
-    const columns = [
-        "Poverty_Value",
-        "MHI_value",
-        "Food_Stamp_Value",
-        "Obesity_Value",
-        "Physical_Inactivity_Value",
-        "Unemployment_Value"
+    const cols = [
+        "Poverty_Value", "MHI_value", "Food_Stamp_Value",
+        "Obesity_Value", "Physical_Inactivity_Value", "Unemployment_Value"
     ];
-
-    dropdown1.selectAll("option").remove();
-    dropdown2.selectAll("option").remove();
-    dropdown3.selectAll("option").remove();
-
-    dropdown1.selectAll("option")
-        .data(columns)
+    d3.selectAll("#dropdown1, #dropdown2, #dropdown3")
+        .selectAll("option")
+        .data(cols)
         .enter().append("option")
-        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
+        .text(d => d.replace(/_/g, " "))
         .attr("value", d => d);
 
-    dropdown2.selectAll("option")
-        .data(columns)
-        .enter().append("option")
-        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
-        .attr("value", d => d);
+    d3.select("#dropdown1").property("value", cols[0]);
+    d3.select("#dropdown2").property("value", cols[1]);
+    d3.select("#dropdown3").property("value", cols[0]);
 
-    dropdown3.selectAll("option")
-        .data(columns)
-        .enter().append("option")
-        .text(d => d.replace(/_/g, " "))  // Replacing underscores with spaces
-        .attr("value", d => d);
-
-    dropdown1.property("value", columns[0]);
-    dropdown2.property("value", columns[1]);
-    dropdown3.property("value", columns[0]);
-
-    dropdown1.on("change", updateCharts);
-    dropdown2.on("change", updateCharts);
-    dropdown3.on("change", () => updateMap(dropdown3.node().value));
+    d3.select("#dropdown1").on("change", updateCharts);
+    d3.select("#dropdown2").on("change", updateCharts);
+    d3.select("#dropdown3").on("change", () => updateMap(d3.select("#dropdown3").node().value));
 }
 
 function updateCharts() {
-    if (!data.length) {
-        console.warn("Data is not yet loaded.");
-        return;
-    }
-
-    let Attribute1 = d3.select("#dropdown1").node().value;
-    let Attribute2 = d3.select("#dropdown2").node().value;
-
-    console.log("Selected Attributes:", Attribute1, Attribute2);
-
-    const filteredData = data.map(d => ({
-        x: +d[Attribute1],
-        y: +d[Attribute2],
-        display_name: d.display_name  // Include display_name
+    const attr1 = d3.select("#dropdown1").node().value;
+    const attr2 = d3.select("#dropdown2").node().value;
+    const filtered = data.map(d => ({
+        x: +d[attr1], y: +d[attr2], display_name: d.display_name, id: d.cnty_fips,
+        [attr1]: +d[attr1], [attr2]: +d[attr2]
     })).filter(d => !isNaN(d.x) && !isNaN(d.y));
-    
+
     d3.select("#histogram1").selectAll("*").remove();
     d3.select("#histogram2").selectAll("*").remove();
     d3.select("#scatterplot").selectAll("*").remove();
 
-    createHistogram(filteredData, "x", "#histogram1", Attribute1);
-    createHistogram(filteredData, "y", "#histogram2", Attribute2);
-    createScatterplot(filteredData, Attribute1, Attribute2);
+    createHistogram(filtered, "x", "#histogram1", attr1);
+    createHistogram(filtered, "y", "#histogram2", attr2);
+    createScatterplot(filtered, attr1, attr2);
+    drawRadarChart(filtered,attr1,attr2);
 }
 
 function initializeMap() {
-    let selectedAttribute = d3.select("#dropdown3").node().value;
-    updateMap(selectedAttribute);
+    updateMap(d3.select("#dropdown3").node().value);
 }
 
 function updateMap(attribute) {
-    let colorScale = updateColorScale(attribute);
+    const colorScale = updateColorScale(attribute);
 
     geoData.objects.counties.geometries.forEach(d => {
-        let county = countyData.find(c => c.cnty_fips === d.id);
-        if (county) {
-            d.properties = { ...county };
-        }
+        const county = countyData.find(c => c.cnty_fips === d.id);
+        if (county) d.properties = { ...county };
     });
 
-    renderMap(colorScale, attribute);
+    renderMap(colorScale, attribute, null);
+}
+
+function updateMapWithFilter(attribute, selectedIds) {
+    const colorScale = updateColorScale(attribute);
+
+    renderMap(colorScale, attribute, new Set(selectedIds));
 }
 
 function updateColorScale(attribute) {
-    let values = countyData.map(d => +d[attribute]).filter(d => !isNaN(d));
-    return d3.scaleSequential(d3.interpolateBlues).domain([d3.min(values), d3.max(values)]);
+    const values = countyData.map(d => +d[attribute]).filter(d => !isNaN(d));
+    return d3.scaleLinear()
+        .domain([d3.min(values), d3.max(values)])
+        .range(["#c7d9e9", "#4682b4"]);
 }
 
-function renderMap(colorScale, attribute) {
+function renderMap(colorScale, attribute, selectedSet) {
     d3.select(".viz").html("");
 
     const width = 960, height = 600;
     const projection = d3.geoAlbersUsa().scale(1000).translate([width / 2, height / 2]);
     const path = d3.geoPath().projection(projection);
-
     const svg = d3.select(".viz").append("svg")
-        .attr("width", width)
-        .attr("height", height)
+        .attr("width", width).attr("height", height)
         .attr("style", "border: 2px solid black;");
 
     const g = svg.append("g");
-
-    const zoom = d3.zoom()
-        .scaleExtent([1, 8])
-        .on("zoom", (event) => {
-            g.attr("transform", event.transform);
-        });
-
-    svg.call(zoom);
+    svg.call(d3.zoom().scaleExtent([1, 8]).on("zoom", e => g.attr("transform", e.transform)));
 
     const counties = topojson.feature(geoData, geoData.objects.counties);
-
-    // Create tooltip
     const tooltip = d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("background", "#dea3bf")
-        .style("color", "black")
-        .style("padding", "5px 10px")
-        .style("border-radius", "5px")
-        .style("visibility", "hidden")
-        .style("pointer-events", "none");
+        .attr("class", "tooltip").style("position", "absolute")
+        .style("background", "#dea3bf").style("color", "black")
+        .style("padding", "5px 10px").style("border-radius", "5px")
+        .style("visibility", "hidden").style("pointer-events", "none");
 
-    g.selectAll("path")
-        .data(counties.features)
-        .enter().append("path")
+    g.selectAll("path").data(counties.features).enter().append("path")
         .attr("d", path)
-        .attr("fill", d => d.properties[attribute] ? colorScale(d.properties[attribute]) : "#ccc")
-        .attr("stroke", "#333")
-        .attr("stroke-width", 0.5)
+        .attr("fill", d => {
+            if (selectedSet && !selectedSet.has(d.id)) return "#eee";
+            return d.properties[attribute] ? colorScale(d.properties[attribute]) : "#ccc";
+        })
+        .attr("stroke", "#333").attr("stroke-width", 0.5)
         .on("mouseover", function (event, d) {
             d3.select(this).attr("stroke-width", 2);
-
-            // Get county name (display_name) and attribute value
-            const countyName = d.properties.display_name || "Unknown County";
-            const attrValue = d.properties[attribute] || "N/A";
-
-            // Show tooltip with county name and attribute
             tooltip.style("visibility", "visible")
-                .html(`<strong>${countyName}</strong><br>${attribute}: ${attrValue}`);
+                .html(`<strong>${d.properties.display_name}</strong><br>${attribute}: ${d.properties[attribute] || "N/A"}`);
         })
-        .on("mousemove", function (event) {
-            tooltip.style("top", `${event.pageY + 10}px`)
-                .style("left", `${event.pageX + 10}px`);
-        })
+        .on("mousemove", e => tooltip.style("top", `${e.pageY + 10}px`).style("left", `${e.pageX + 10}px`))
         .on("mouseout", function () {
             d3.select(this).attr("stroke-width", 0.5);
             tooltip.style("visibility", "hidden");
@@ -208,198 +138,233 @@ function renderLegend(colorScale) {
     d3.select("#legend").remove();
 
     const legendWidth = 300, legendHeight = 20;
-    const legendSvg = d3.select(".viz")
-        .append("svg")
-        .attr("id", "legend")
-        .attr("width", legendWidth)
-        .attr("height", legendHeight);
-
+    const legendSvg = d3.select(".viz").append("svg")
+        .attr("id", "legend").attr("width", legendWidth).attr("height", legendHeight);
 
     const defs = legendSvg.append("defs");
-    const linearGradient = defs.append("linearGradient")
-        .attr("id", "legend-gradient")
-        .attr("x1", "0%").attr("y1", "0%")
-        .attr("x2", "100%").attr("y2", "0%");
+    const gradient = defs.append("linearGradient")
+        .attr("id", "legend-gradient").attr("x1", "0%").attr("x2", "100%");
 
-    const colorRange = d3.range(0, 1.1, 0.1).map(d =>
-        colorScale(d3.min(colorScale.domain()) + d * (d3.max(colorScale.domain()) - d3.min(colorScale.domain())))
+    const domain = colorScale.domain();
+    const colorRange = d3.range(0, 1.01, 0.1).map(d =>
+        colorScale(domain[0] + d * (domain[1] - domain[0]))
     );
 
-    linearGradient.selectAll("stop")
+    gradient.selectAll("stop")
         .data(colorRange)
         .enter().append("stop")
-        .attr("offset", (d, i) => `${(i / (colorRange.length - 1)) * 100}%`)
+        .attr("offset", (d, i) => `${i / (colorRange.length - 1) * 100}%`)
         .attr("stop-color", d => d);
 
     legendSvg.append("rect")
-        .attr("width", legendWidth)
-        .attr("height", legendHeight - 10)
+        .attr("width", legendWidth).attr("height", legendHeight - 10)
         .style("fill", "url(#legend-gradient)");
 
-    const legendScale = d3.scaleLinear()
-        .domain(colorScale.domain())
-        .range([0, legendWidth]);
-
-    const legendAxis = d3.axisBottom(legendScale).ticks(5).tickFormat(d3.format(".2s"));
-
+    const legendScale = d3.scaleLinear().domain(domain).range([0, legendWidth]);
     legendSvg.append("g")
         .attr("transform", `translate(0, ${legendHeight - 18})`)
-        .call(legendAxis);
+        .call(d3.axisBottom(legendScale).ticks(5));
 }
 
 function createHistogram(data, attribute, container, label) {
     let svg = d3.select(container)
-        .attr("width", 600)
-        .attr("height", 450)
-        .attr("style", "border: 2px solid black;")
-        .append("g")
-        .attr("transform", "translate(50, 30)");
+        .attr("width", 600).attr("height", 450)
+        .append("g").attr("transform", "translate(50, 30)");
 
-    let width = 500;
-    let height = 350;
+    let width = 500, height = 350;
+    let x = d3.scaleLinear().domain([0, d3.max(data, d => d[attribute])]).range([0, width]);
+    let bins = d3.histogram().domain(x.domain()).thresholds(x.ticks(20))(data.map(d => d[attribute]));
+    let y = d3.scaleLinear().domain([0, d3.max(bins, d => d.length)]).range([height, 0]);
 
-    let x = d3.scaleLinear()
-        .domain([0, d3.max(data, d => d[attribute])])
-        .range([0, width]);
-
-    let bins = d3.histogram()
-        .domain(x.domain())
-        .thresholds(x.ticks(20))
-        (data.map(d => d[attribute]));
-
-    let y = d3.scaleLinear()
-        .domain([0, d3.max(bins, d => d.length)])
-        .range([height, 0]);
-
-    // X Axis
-    svg.append("g")
-        .attr("transform", `translate(0, ${height})`)
-        .call(d3.axisBottom(x));
-
-    // Y Axis
-    svg.append("g")
-        .call(d3.axisLeft(y));
-
-    // Title
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", -10)
-        .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .text(" Histogram of " + label.replace(/_/g, " "));
-
-    // X Axis Label
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + 35)
-        .attr("text-anchor", "middle")
+    svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
+    svg.append("g").call(d3.axisLeft(y));
+    svg.append("text").attr("x", width / 2).attr("y", -10).attr("text-anchor", "middle")
+        .style("font-size", "16px").text(`Histogram of ${label.replace(/_/g, " ")}`);
+    svg.append("text").attr("x", width / 2).attr("y", height + 35).attr("text-anchor", "middle")
         .text(label.replace(/_/g, " "));
+    svg.append("text").attr("transform", "rotate(-90)").attr("x", -height / 2).attr("y", -35)
+        .attr("text-anchor", "middle").text("Count");
 
-    // Y Axis Label
-    svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
-        .attr("y", -35)
-        .attr("text-anchor", "middle")
-        .text("Count");
-
-    let tooltip = createTooltip();
-
+    const tooltip = createTooltip();
     svg.selectAll("rect")
-        .data(bins)
-        .enter().append("rect")
+        .data(bins).enter().append("rect")
         .attr("x", d => x(d.x0))
         .attr("width", d => Math.max(1, x(d.x1) - x(d.x0) - 1))
         .attr("y", d => y(d.length))
         .attr("height", d => height - y(d.length))
         .attr("fill", "steelblue")
-        .on("mouseover", (event, d) => {
-            tooltip.style("visibility", "visible")
-                .text(`Count: ${d.length}`);
-        })
-        .on("mousemove", event => {
-            tooltip.style("top", `${event.pageY + 10}px`)
-                .style("left", `${event.pageX + 10}px`);
-        })
+        .on("mouseover", (e, d) => tooltip.style("visibility", "visible").text(`Count: ${d.length}`))
+        .on("mousemove", e => tooltip.style("top", `${e.pageY + 10}px`).style("left", `${e.pageX + 10}px`))
         .on("mouseout", () => tooltip.style("visibility", "hidden"));
+
+    const brush = d3.brushX()
+        .extent([[0, 0], [width, height]])
+        .on("brush end", function (event) {
+            if (activeBrush && activeBrush !== this) d3.select(activeBrush).call(d3.brush().clear);
+            activeBrush = this;
+            if (!event.selection) {
+                currentFilter = null;
+                updateMap(d3.select("#dropdown3").node().value);
+                return;
+            }
+            const [x0, x1] = event.selection.map(x.invert);
+            const selected = data.filter(d => d[attribute] >= x0 && d[attribute] <= x1);
+            const ids = selected.map(d => d.id);
+            currentFilter = ids;
+            updateMapWithFilter(d3.select("#dropdown3").node().value, ids);
+        });
+
+    svg.append("g").attr("class", "brush").call(brush);
 }
 
 function createScatterplot(data, attrX, attrY) {
     let svg = d3.select("#scatterplot")
-        .attr("width", 600)
-        .attr("height", 450)
+        .attr("width", 600).attr("height", 450)
+        .append("g").attr("transform", "translate(50, 30)");
+
+    let width = 500, height = 350;
+    let x = d3.scaleLinear().domain(d3.extent(data, d => d.x)).range([0, width]);
+    let y = d3.scaleLinear().domain(d3.extent(data, d => d.y)).range([height, 0]);
+
+    svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x));
+    svg.append("g").call(d3.axisLeft(y));
+    svg.append("text").attr("x", width / 2).attr("y", -10).attr("text-anchor", "middle")
+        .style("font-size", "16px").text(`${attrX.replace(/_/g, " ")} vs ${attrY.replace(/_/g, " ")}`);
+    svg.append("text").attr("x", width / 2).attr("y", height + 35).attr("text-anchor", "middle")
+        .text(attrX.replace(/_/g, " "));
+    svg.append("text").attr("transform", "rotate(-90)").attr("x", -height / 2).attr("y", -35)
+        .attr("text-anchor", "middle").text(attrY.replace(/_/g, " "));
+
+    const tooltip = createTooltip();
+    svg.selectAll("circle").data(data).enter().append("circle")
+        .attr("cx", d => x(d.x)).attr("cy", d => y(d.y)).attr("r", 4).attr("fill", "steelblue").attr("opacity", 0.6)
+        .on("mouseover", (e, d) => tooltip.style("visibility", "visible")
+            .html(`<strong>${d.display_name}</strong><br>${attrX}: ${d.x}<br>${attrY}: ${d.y}`))
+        .on("mousemove", e => tooltip.style("top", `${e.pageY + 10}px`).style("left", `${e.pageX + 10}px`))
+        .on("mouseout", () => tooltip.style("visibility", "hidden"));
+
+    const brush = d3.brush()
+        .extent([[0, 0], [width, height]])
+        .on("brush end", function (event) {
+            if (activeBrush && activeBrush !== this) d3.select(activeBrush).call(d3.brush().clear);
+            activeBrush = this;
+            if (!event.selection) {
+                currentFilter = null;
+                updateMap(d3.select("#dropdown3").node().value);
+                return;
+            }
+            const [[x0, y0], [x1, y1]] = event.selection;
+            const selected = data.filter(d => {
+                const cx = x(d.x), cy = y(d.y);
+                return cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
+            });
+            const ids = selected.map(d => d.id);
+            currentFilter = ids;
+            updateMapWithFilter(d3.select("#dropdown3").node().value, ids);
+        });
+
+    svg.append("g").attr("class", "brush").call(brush);
+}
+
+function createTooltip() {
+    return d3.select("body").append("div")
+        .attr("class", "tooltip").style("position", "absolute")
+        .style("background", "#dea3bf").style("color", "black")
+        .style("padding", "5px").style("border-radius", "5px")
+        .style("pointer-events", "none").style("visibility", "hidden");
+}
+
+
+function drawRadarChart(filteredData, attribute1, attribute2) {
+    // Clear any existing content
+    d3.select("#radarChart").selectAll("*").remove();
+
+    const width = 600;
+    const height = 500;
+    const margin = 50;
+    const radius = Math.min(width, height) / 2 - margin;
+
+    const attributes = [attribute1, attribute2];
+
+    // Map filteredData to extract the values of the selected attributes
+    const dataValues = attributes.map(attr => ({
+        axis: attr.replace(/_/g, " "), // Replace underscores with spaces for readability
+        value: +filteredData[attr] || 0 // Get value or 0 if the attribute is not present
+    }));
+
+    const maxValue = d3.max(dataValues, d => d.value) || 1;
+    const angleSlice = (2 * Math.PI) / dataValues.length;
+
+    // Create the SVG container for the radar chart
+    const svg = d3.select("#radarChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
         .attr("style", "border: 2px solid black;")
         .append("g")
-        .attr("transform", "translate(50, 30)");
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
 
-    let width = 500;
-    let height = 350;
+    // Draw concentric circles
+    const levels = 5;
+    for (let level = 1; level <= levels; level++) {
+        const rLevel = (radius / levels) * level;
+        svg.append("circle")
+            .attr("r", rLevel)
+            .attr("fill", "none")
+            .attr("stroke", "#ccc");
+    }
 
-    let x = d3.scaleLinear()
-        .domain(d3.extent(data, d => d.x))
-        .range([0, width]);
+    // Draw axes and labels
+    const axis = svg.selectAll(".axis")
+        .data(dataValues)
+        .enter()
+        .append("g")
+        .attr("class", "axis");
 
-    let y = d3.scaleLinear()
-        .domain(d3.extent(data, d => d.y))
-        .range([height, 0]);
+    axis.append("line")
+        .attr("x1", 0)
+        .attr("y1", 0)
+        .attr("x2", (d, i) => radius * Math.cos(angleSlice * i - Math.PI / 2))
+        .attr("y2", (d, i) => radius * Math.sin(angleSlice * i - Math.PI / 2))
+        .attr("stroke", "#999");
 
-    // X Axis
-    svg.append("g")
-        .attr("transform", `translate(0, ${height})`)
-        .call(d3.axisBottom(x));
+    axis.append("text")
+        .attr("x", (d, i) => (radius + 20) * Math.cos(angleSlice * i - Math.PI / 2))
+        .attr("y", (d, i) => (radius + 20) * Math.sin(angleSlice * i - Math.PI / 2))
+        .attr("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text(d => d.axis);
 
-    // Y Axis
-    svg.append("g")
-        .call(d3.axisLeft(y));
+    // Draw radar area (polygon)
+    const radarLine = d3.lineRadial()
+        .radius(d => (d.value / maxValue) * radius)
+        .angle((d, i) => i * angleSlice)
+        .curve(d3.curveLinearClosed);
 
-    // Title
+    svg.append("path")
+        .datum(dataValues)
+        .attr("d", radarLine)
+        .attr("fill", "lightblue")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 2)
+        .attr("fill-opacity", 0.6);
+
+    // Draw data points on the radar chart
+    svg.selectAll(".radar-point")
+        .data(dataValues)
+        .enter()
+        .append("circle")
+        .attr("cx", (d, i) => (d.value / maxValue) * radius * Math.cos(angleSlice * i - Math.PI / 2))
+        .attr("cy", (d, i) => (d.value / maxValue) * radius * Math.sin(angleSlice * i - Math.PI / 2))
+        .attr("r", 5)
+        .attr("fill", "steelblue");
+
+    // Optional: Title of the radar chart (if there's a display_name in the filtered data)
     svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", -10)
+        .attr("x", 0)
+        .attr("y", -height / 2 + margin)
         .attr("text-anchor", "middle")
         .style("font-size", "16px")
-        .text(attrX.replace(/_/g, " ") + " vs " + attrY.replace(/_/g, " "));
-
-    // X Axis Label
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + 35)
-        .attr("text-anchor", "middle")
-        .text(attrX.replace(/_/g, " "));
-
-    // Y Axis Label
-    svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
-        .attr("y", -35)
-        .attr("text-anchor", "middle")
-        .text(attrY.replace(/_/g, " "));
-
-    const tooltip = d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("background", "#dea3bf")
-        .style("color", "black")
-        .style("padding", "5px 10px")
-        .style("border-radius", "5px")
-        .style("visibility", "hidden")
-        .style("pointer-events", "none");
-
-    svg.selectAll("circle")
-        .data(data)
-        .enter().append("circle")
-        .attr("cx", d => x(d.x))
-        .attr("cy", d => y(d.y))
-        .attr("r", 4)
-        .attr("fill", "steelblue")
-        .attr("opacity",0.5)
-        .on("mouseover", (event, d) => {
-            tooltip.style("visibility", "visible")
-                .html(`<strong>${d.display_name}</strong><br>${attrX.replace(/_/g, " ")}: ${d.x}<br>${attrY.replace(/_/g, " ")}: ${d.y}`);
-        })
-        .on("mousemove", event => {
-            tooltip.style("top", `${event.pageY + 10}px`)
-                .style("left", `${event.pageX + 10}px`);
-        })
-        .on("mouseout", () => tooltip.style("visibility", "hidden"));
+        .style("font-weight", "bold")
+        .text(filteredData.display_name || "Filtered Data");
 }

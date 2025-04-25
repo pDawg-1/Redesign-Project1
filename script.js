@@ -28,8 +28,12 @@ Promise.all([
 
   function updateColorScale(attribute) {
     let values = countyData.map(d => +d[attribute]).filter(d => !isNaN(d));
-    return d3.scaleSequential(d3.interpolateBlues).domain([d3.min(values), d3.max(values)]);
-  }
+    return d3.scaleLinear()
+        .domain([d3.min(values), d3.max(values)])
+        .range(["#f2f0f7", "#9e0f0f"]);  // Light to dark red gradient (you can change these colors)
+}
+
+
 
   function updateMap(attribute) {
     let colorScale = updateColorScale(attribute);

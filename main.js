@@ -276,26 +276,28 @@ function createTooltip() {
 
 
 function drawRadarChart(filteredData, attribute1, attribute2) {
-    // Clear any existing content
     d3.select("#radarChart").selectAll("*").remove();
 
-    const width = 600;
-    const height = 500;
-    const margin = 50;
+    const width = 600, height = 500, margin = 50;
     const radius = Math.min(width, height) / 2 - margin;
 
-    const attributes = [attribute1, attribute2];
+    const attributes = [
+        "Poverty_Value", "MHI_value", "Food_Stamp_Value",
+        "Obesity_Value", "Physical_Inactivity_Value", "Unemployment_Value"
+    ];
 
-    // Map filteredData to extract the values of the selected attributes
-    const dataValues = attributes.map(attr => ({
-        axis: attr.replace(/_/g, " "), // Replace underscores with spaces for readability
-        value: +filteredData[attr] || 0 // Get value or 0 if the attribute is not present
-    }));
+    // Calculate average values for each attribute
+    const averages = attributes.map(attr => {
+        const values = filteredData.map(d => +d[attr]).filter(d => !isNaN(d));
+        return {
+            axis: attr.replace(/_/g, " "),
+            value: values.length ? d3.mean(values) : 0
+        };
+    });
 
-    const maxValue = d3.max(dataValues, d => d.value) || 1;
-    const angleSlice = (2 * Math.PI) / dataValues.length;
+    const maxValue = d3.max(averages, d => d.value) || 1;
+    const angleSlice = (2 * Math.PI) / averages.length;
 
-    // Create the SVG container for the radar chart
     const svg = d3.select("#radarChart")
         .append("svg")
         .attr("width", width)
@@ -307,16 +309,15 @@ function drawRadarChart(filteredData, attribute1, attribute2) {
     // Draw concentric circles
     const levels = 5;
     for (let level = 1; level <= levels; level++) {
-        const rLevel = (radius / levels) * level;
         svg.append("circle")
-            .attr("r", rLevel)
+            .attr("r", (radius / levels) * level)
             .attr("fill", "none")
             .attr("stroke", "#ccc");
     }
 
-    // Draw axes and labels
+    // Draw axes
     const axis = svg.selectAll(".axis")
-        .data(dataValues)
+        .data(averages)
         .enter()
         .append("g")
         .attr("class", "axis");
@@ -335,36 +336,34 @@ function drawRadarChart(filteredData, attribute1, attribute2) {
         .style("font-size", "12px")
         .text(d => d.axis);
 
-    // Draw radar area (polygon)
+    // Radar line
     const radarLine = d3.lineRadial()
         .radius(d => (d.value / maxValue) * radius)
         .angle((d, i) => i * angleSlice)
         .curve(d3.curveLinearClosed);
 
     svg.append("path")
-        .datum(dataValues)
+        .datum(averages)
         .attr("d", radarLine)
         .attr("fill", "lightblue")
         .attr("stroke", "steelblue")
         .attr("stroke-width", 2)
         .attr("fill-opacity", 0.6);
 
-    // Draw data points on the radar chart
     svg.selectAll(".radar-point")
-        .data(dataValues)
+        .data(averages)
         .enter()
         .append("circle")
         .attr("cx", (d, i) => (d.value / maxValue) * radius * Math.cos(angleSlice * i - Math.PI / 2))
         .attr("cy", (d, i) => (d.value / maxValue) * radius * Math.sin(angleSlice * i - Math.PI / 2))
-        .attr("r", 5)
+        .attr("r", 4)
         .attr("fill", "steelblue");
-
-    // Optional: Title of the radar chart (if there's a display_name in the filtered data)
-    svg.append("text")
+        svg.append("text")
         .attr("x", 0)
-        .attr("y", -height / 2 + margin)
+        .attr("y", -radius - 30)  // Push it above the outermost circle
         .attr("text-anchor", "middle")
         .style("font-size", "16px")
         .style("font-weight", "bold")
         .text(filteredData.display_name || "Filtered Data");
+    
 }
